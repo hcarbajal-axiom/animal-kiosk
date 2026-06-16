@@ -449,12 +449,17 @@
             
             try {
                 // Call backend for Claude API
-                const res = await fetch(`${BACKEND_URL}/api/claude`, {
+                const res = await fetch(`${BACKEND_URL}/api/claude/v1/messages`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ question: question }),
+                    body: JSON.stringify({
+                        model: 'claude-3-5-sonnet-20241022',
+                        max_tokens: 300,
+                        system: 'You are Leo, a friendly panda animal expert. Answer questions about animals briefly in 1-2 sentences.',
+                        messages: [{ role: 'user', content: question }]
+                    }),
                 });
                 
                 if (!res.ok) {
@@ -462,7 +467,7 @@
                 }
                 
                 const data = await res.json();
-                const response = data.text;
+                const response = data.content[0].text;
                 
                 document.getElementById('response').textContent = response;
                 document.getElementById('response').style.display = 'block';
@@ -492,14 +497,13 @@
         
         async function speakWithBackend(text) {
             try {
-                const response = await fetch(`${BACKEND_URL}/api/tts`, {
+                const response = await fetch(`${BACKEND_URL}/api/elevenlabs/v1/text-to-speech/${VOICE_ID}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         text: text,
-                        voiceId: VOICE_ID,
                     }),
                 });
                 
