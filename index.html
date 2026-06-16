@@ -402,9 +402,14 @@
         });
         
         // Speech recognition
-        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.continuous = true;
-        recognition.lang = 'en-US';
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'en-US';
+        } else {
+            console.warn('Speech Recognition not supported in this browser');
+        }
         
         recognition.onstart = () => { isListening = true; };
         recognition.onresult = (event) => {
@@ -449,7 +454,10 @@
             
             try {
                 // Call backend for Claude API
-                const res = await fetch(`${BACKEND_URL}/api/claude/v1/messages`, {
+                const endpoint = `${BACKEND_URL}/api/claude/v1/messages`;
+                console.log('Calling endpoint:', endpoint);
+                
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -462,7 +470,11 @@
                     }),
                 });
                 
+                console.log('Response status:', res.status);
+                
                 if (!res.ok) {
+                    const errorText = await res.text();
+                    console.log('Error response:', errorText);
                     throw new Error('Backend error: ' + res.status);
                 }
                 
