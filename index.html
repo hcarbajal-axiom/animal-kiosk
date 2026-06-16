@@ -410,7 +410,6 @@
         } else {
             console.warn('Speech Recognition not supported in this browser');
         }
-        
         recognition.onstart = () => { isListening = true; };
         recognition.onresult = (event) => {
             if (!microphoneEnabled) return;
@@ -433,7 +432,9 @@
         function startListening() {
             if (recognition) {
                 try { recognition.start(); }
-                catch(e) { }
+                catch(e) { console.log('Could not start recognition:', e); }
+            } else {
+                alert('⚠️ Speech recognition not supported in this browser. Please type your question instead.');
             }
         }
         
@@ -463,9 +464,8 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        model: 'claude-3-5-sonnet-20241022',
-                        max_tokens: 300,
-                        system: 'You are Leo, a friendly panda animal expert. Answer questions about animals briefly in 1-2 sentences.',
+                        model: 'claude-opus-4-5',
+                        max_tokens: 1024,
                         messages: [{ role: 'user', content: question }]
                     }),
                 });
