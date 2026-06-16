@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Assistant - Panda Avatar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        #container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 2rem;
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        #canvas-container {
+            background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f0 100%);
+            position: relative;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            padding: 2rem;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+        .control-section {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+        .control-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        button.secondary { background: #e9ecef; color: #333; }
+        #response {
+            background: #e7f5ff;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #333;
+            display: none;
+            margin-top: 12px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .status-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #f1f3f5;
+            border-radius: 6px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #51cf66;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .status-dot.processing { background: #ffa94d; }
+        .status-dot.error { background: #ff6b6b; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .toggle-switch {
+            width: 50px;
+            height: 28px;
+            background: #ccc;
+            border-radius: 14px;
+            cursor: pointer;
+            position: relative;
+        }
+        .toggle-switch.active { background: #667eea; }
+        .toggle-knob {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 12px;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+        .toggle-switch.active .toggle-knob { left: 24px; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div id="controls">
+            <div class="control-section">
+                <h3>🎙️ Microphone</h3>
+                <div style="display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-top: 10px;">
+                    <span style="font-size: 12px; color: #666;" id="mic-status">OFF</span>
+                    <div class="toggle-switch" id="mic-toggle">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+                <div class="status-line">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Ready</span>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>🦁 Ask About Animals</h3>
+                <input type="text" id="question-input" placeholder="Ask about animals...">
+                <button id="ask-btn">Send & Speak</button>
+                <button class="secondary" id="stop-btn" style="display: none;">⏹️ Stop</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>📢 Response</h3>
+                <div id="response"></div>
+                <button class="secondary" id="clear-btn" style="margin-top: 12px;">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLAUDE_API_KEY = "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";
+        const ELEVENLABS_API_KEY = "sk_2a4ac894c9e5f7611cf657eb6804dd474a579d73bf2e998a";
+        const VOICE_ID = "si0svtk05vPEuvwAW93c";
+        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 500;
+        canvas.height = 400;
+        
+        let isSpeaking = false;
+        let microphoneEnabled = false;
+        let isListening = false;
+        let recognition = null;
+        let avatarState = 'happy';
+        let frameCount = 0;
+        let currentAudio = null;
+        
+        // Panda Avatar
+        class PandaAvatar {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.faceRadius = 100;
+                this.state = 'happy';
+            }
+            
+            draw(mouthOpen) {
+                // Main white face
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.faceRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Left ear (black)
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(this.x - 70, this.y - 80, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Right ear (black)
+                ctx.beginPath();
+                ctx.arc(this.x + 70, this.y - 80, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Left eye patch (black)
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(this.x - 40, this.y - 20, 25, 35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Right eye patch (black)
+                ctx.beginPath();
+                ctx.ellipse(this.x + 40, this.y - 20, 25, 35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Left eye white
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x - 40, this.y - 25, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Right eye white
+                ctx.beginPath();
+                ctx.arc(this.x + 40, this.y - 25, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Left pupil
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(this.x - 40, this.y - 25, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Right pupil
+                ctx.beginPath();
+                ctx.arc(this.x + 40, this.y - 25, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes shine
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x - 37, this.y - 28, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x + 43, this.y - 28, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Nose (black)
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y + 15, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Mouth
+                this.drawMouth(mouthOpen);
+                
+                // Blush (when happy)
+                if (this.state === 'happy' || this.state === 'excited') {
+                    ctx.fillStyle = 'rgba(255, 182, 193, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(this.x - 65, this.y + 20, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.x + 65, this.y + 20, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            drawMouth(mouthOpen) {
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.fillStyle = '#333';
+                
+                if (this.state === 'thinking') {
+                    // Worried mouth
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + 55, 25, Math.PI * 0.5, Math.PI * 1.5);
+                    ctx.stroke();
+                } else if (isSpeaking) {
+                    if (mouthOpen) {
+                        // OPEN MOUTH - big O
+                        ctx.beginPath();
+                        ctx.ellipse(this.x, this.y + 55, 20, 30, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // CLOSED MOUTH - line
+                        ctx.beginPath();
+                        ctx.moveTo(this.x - 20, this.y + 55);
+                        ctx.lineTo(this.x + 20, this.y + 55);
+                        ctx.stroke();
+                    }
+                } else {
+                    // Normal smile
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + 50, 25, 0, Math.PI);
+                    ctx.stroke();
+                }
+            }
+            
+            setState(newState) {
+                this.state = newState;
+            }
+        }
+        
+        const avatar = new PandaAvatar();
+        
+        // Animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            frameCount++;
+            
+            // Idle animation - gentle sway
+            if (!isSpeaking && !microphoneEnabled) {
+                avatar.x = canvas.width / 2 + Math.sin(frameCount * 0.02) * 8;
+            } else {
+                avatar.x = canvas.width / 2;
+            }
+            
+            // Calculate mouth state: open for 15 frames, closed for 15 frames
+            const mouthOpen = Math.floor((frameCount % 30) / 15) === 1;
+            
+            avatar.draw(mouthOpen);
+            requestAnimationFrame(animate);
+        }
+        animate();
+        
+        // Setup UI
+        document.getElementById('mic-toggle').addEventListener('click', () => {
+            microphoneEnabled = !microphoneEnabled;
+            const toggle = document.getElementById('mic-toggle');
+            
+            if (microphoneEnabled) {
+                toggle.classList.add('active');
+                document.getElementById('mic-status').textContent = 'ON';
+                updateStatus('Listening...', 'processing');
+                avatar.setState('happy');
+                startListening();
+            } else {
+                toggle.classList.remove('active');
+                document.getElementById('mic-status').textContent = 'OFF';
+                updateStatus('Ready', 'idle');
+                avatar.setState('happy');
+                if (recognition) recognition.stop();
+            }
+        });
+        
+        document.getElementById('question-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') askQuestion();
+        });
+        
+        document.getElementById('ask-btn').addEventListener('click', askQuestion);
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            if (currentAudio) currentAudio.pause();
+            isSpeaking = false;
+            document.getElementById('stop-btn').style.display = 'none';
+            avatar.setState('happy');
+            updateStatus('Stopped', 'idle');
+        });
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            document.getElementById('question-input').value = '';
+            document.getElementById('response').style.display = 'none';
+            if (currentAudio) currentAudio.pause();
+            isSpeaking = false;
+            avatar.setState('happy');
+            updateStatus('Ready', 'idle');
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body) {
+                e.preventDefault();
+                document.getElementById('mic-toggle').click();
+            }
+        });
+        
+        // Speech recognition
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = true;
+        recognition.lang = 'en-US';
+        
+        recognition.onstart = () => { isListening = true; };
+        recognition.onresult = (event) => {
+            if (!microphoneEnabled) return;
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            document.getElementById('question-input').value = transcript;
+            if (event.results[event.results.length - 1].isFinal) {
+                setTimeout(askQuestion, 300);
+            }
+        };
+        recognition.onend = () => {
+            isListening = false;
+            if (microphoneEnabled && recognition) {
+                setTimeout(() => recognition.start(), 100);
+            }
+        };
+        
+        function startListening() {
+            if (recognition) {
+                try { recognition.start(); }
+                catch(e) { }
+            }
+        }
+        
+        async function askQuestion() {
+            const question = document.getElementById('question-input').value.trim();
+            if (!question || isSpeaking) return;
+            
+            isSpeaking = true;
+            avatar.setState('thinking');
+            updateStatus('Processing...', 'processing');
+            document.getElementById('ask-btn').disabled = true;
+            document.getElementById('stop-btn').style.display = 'block';
+            
+            try {
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': CLAUDE_API_KEY,
+                        'anthropic-version': '2023-06-01',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-3-5-sonnet-20241022',
+                        max_tokens: 300,
+                        system: 'You are Leo, a friendly panda animal expert. Answer questions about animals briefly in 1-2 sentences.',
+                        messages: [{ role: 'user', content: question }],
+                    }),
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error?.message || 'API error');
+                }
+                
+                const data = await res.json();
+                const response = data.content[0].text;
+                
+                document.getElementById('response').textContent = response;
+                document.getElementById('response').style.display = 'block';
+                updateStatus('Speaking...', 'processing');
+                
+                avatar.setState('happy');
+                
+                // Use ElevenLabs for text-to-speech
+                await speakWithElevenLabs(response);
+                
+                isSpeaking = false;
+                avatar.setState('happy');
+                document.getElementById('stop-btn').style.display = 'none';
+                updateStatus('Done!', 'idle');
+                
+            } catch(error) {
+                console.error(error);
+                document.getElementById('response').textContent = 'Error: ' + error.message;
+                document.getElementById('response').style.display = 'block';
+                updateStatus('Error', 'error');
+                isSpeaking = false;
+                avatar.setState('happy');
+            }
+            
+            document.getElementById('ask-btn').disabled = false;
+        }
+        
+        async function speakWithElevenLabs(text) {
+            try {
+                const elevenLabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
+                const proxyUrl = CORS_PROXY + encodeURIComponent(elevenLabsUrl);
+                
+                const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'xi-api-key': ELEVENLABS_API_KEY,
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: 'eleven_monolingual_v1',
+                        voice_settings: {
+                            stability: 0.5,
+                            similarity_boost: 0.75,
+                        },
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('ElevenLabs API error: ' + response.status);
+                }
+                
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                currentAudio = new Audio(audioUrl);
+                currentAudio.play();
+                
+                // Wait for audio to finish
+                return new Promise((resolve) => {
+                    currentAudio.onended = () => {
+                        resolve();
+                    };
+                    currentAudio.onerror = () => {
+                        resolve();
+                    };
+                });
+            } catch(error) {
+                console.error('ElevenLabs error:', error);
+                throw error;
+            }
+        }
+        
+        function updateStatus(text, type = 'idle') {
+            document.getElementById('status-text').textContent = text;
+            const dot = document.getElementById('status-dot');
+            dot.className = 'status-dot';
+            if (type === 'processing') dot.classList.add('processing');
+            else if (type === 'error') dot.classList.add('error');
+        }
+    </script>
+</body>
+</html>
