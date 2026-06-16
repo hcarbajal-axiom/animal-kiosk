@@ -183,18 +183,9 @@
     </div>
 
     <script>
-        const PROXY = "https://your-project.replit.app";
-
-async function askClaude(messages) {
-  const res = await fetch(`${PROXY}/api/claude/v1/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-opus-4-5", max_tokens: 1024, messages })
-  });
-  return res.json();
-}
+        // Replit backend proxy server
+        const BACKEND_URL = "https://server-tools--hcarbajal.replit.app";
         const VOICE_ID = "si0svtk05vPEuvwAW93c";
-        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -445,6 +436,11 @@ async function askClaude(messages) {
             const question = document.getElementById('question-input').value.trim();
             if (!question || isSpeaking) return;
             
+            if (BACKEND_URL.includes('your-replit')) {
+                alert('⚠️ Please update BACKEND_URL in the code with your Replit URL first!');
+                return;
+            }
+            
             isSpeaking = true;
             avatar.setState('thinking');
             updateStatus('Processing...', 'processing');
@@ -452,28 +448,21 @@ async function askClaude(messages) {
             document.getElementById('stop-btn').style.display = 'block';
             
             try {
-                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                // Call backend for Claude API
+                const res = await fetch(`${BACKEND_URL}/api/claude`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-api-key': CLAUDE_API_KEY,
-                        'anthropic-version': '2023-06-01',
                     },
-                    body: JSON.stringify({
-                        model: 'claude-3-5-sonnet-20241022',
-                        max_tokens: 300,
-                        system: 'You are Leo, a friendly panda animal expert. Answer questions about animals briefly in 1-2 sentences.',
-                        messages: [{ role: 'user', content: question }],
-                    }),
+                    body: JSON.stringify({ question: question }),
                 });
                 
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error?.message || 'API error');
+                    throw new Error('Backend error: ' + res.status);
                 }
                 
                 const data = await res.json();
-                const response = data.content[0].text;
+                const response = data.text;
                 
                 document.getElementById('response').textContent = response;
                 document.getElementById('response').style.display = 'block';
@@ -481,8 +470,8 @@ async function askClaude(messages) {
                 
                 avatar.setState('happy');
                 
-                // Use ElevenLabs for text-to-speech
-                await speakWithElevenLabs(response);
+                // Use backend for TTS
+                await speakWithBackend(response);
                 
                 isSpeaking = false;
                 avatar.setState('happy');
@@ -501,29 +490,21 @@ async function askClaude(messages) {
             document.getElementById('ask-btn').disabled = false;
         }
         
-        async function speakWithElevenLabs(text) {
+        async function speakWithBackend(text) {
             try {
-                const elevenLabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
-                const proxyUrl = CORS_PROXY + encodeURIComponent(elevenLabsUrl);
-                
-                const response = await fetch(proxyUrl, {
+                const response = await fetch(`${BACKEND_URL}/api/tts`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'xi-api-key': ELEVENLABS_API_KEY,
                     },
                     body: JSON.stringify({
                         text: text,
-                        model_id: 'eleven_monolingual_v1',
-                        voice_settings: {
-                            stability: 0.5,
-                            similarity_boost: 0.75,
-                        },
+                        voiceId: VOICE_ID,
                     }),
                 });
                 
                 if (!response.ok) {
-                    throw new Error('ElevenLabs API error: ' + response.status);
+                    throw new Error('TTS error: ' + response.status);
                 }
                 
                 const audioBlob = await response.blob();
@@ -532,17 +513,12 @@ async function askClaude(messages) {
                 currentAudio = new Audio(audioUrl);
                 currentAudio.play();
                 
-                // Wait for audio to finish
                 return new Promise((resolve) => {
-                    currentAudio.onended = () => {
-                        resolve();
-                    };
-                    currentAudio.onerror = () => {
-                        resolve();
-                    };
+                    currentAudio.onended = () => resolve();
+                    currentAudio.onerror = () => resolve();
                 });
             } catch(error) {
-                console.error('ElevenLabs error:', error);
+                console.error('Backend TTS error:', error);
                 throw error;
             }
         }
