@@ -183,8 +183,16 @@
     </div>
 
     <script>
-        const CLAUDE_API_KEY = "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";
-        const ELEVENLABS_API_KEY = "sk_2a4ac894c9e5f7611cf657eb6804dd474a579d73bf2e998a";
+        const PROXY = "https://your-project.replit.app";
+
+async function askClaude(messages) {
+  const res = await fetch(`${PROXY}/api/claude/v1/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "claude-opus-4-5", max_tokens: 1024, messages })
+  });
+  return res.json();
+}
         const VOICE_ID = "si0svtk05vPEuvwAW93c";
         const CORS_PROXY = "https://api.allorigins.win/raw?url=";
         
