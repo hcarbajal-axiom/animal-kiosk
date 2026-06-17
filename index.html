@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animal Assistant - Panda Avatar</title>
+    <title>Animal Expert - Panda Kiosk</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -28,17 +28,12 @@
         }
         #canvas-container {
             background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f0 100%);
-            position: relative;
             min-height: 400px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        canvas {
-            max-width: 100%;
-            height: auto;
-            display: block;
-        }
+        canvas { max-width: 100%; height: auto; }
         #controls {
             display: flex;
             flex-direction: column;
@@ -96,7 +91,6 @@
             font-size: 13px;
             color: #333;
             display: none;
-            margin-top: 12px;
             max-height: 120px;
             overflow-y: auto;
         }
@@ -120,10 +114,7 @@
         }
         .status-dot.processing { background: #ffa94d; }
         .status-dot.error { background: #ff6b6b; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .toggle-switch {
             width: 50px;
             height: 28px;
@@ -155,7 +146,7 @@
         <div id="controls">
             <div class="control-section">
                 <h3>🎙️ Microphone</h3>
-                <div style="display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px; justify-content: space-between;">
                     <span style="font-size: 12px; color: #666;" id="mic-status">OFF</span>
                     <div class="toggle-switch" id="mic-toggle">
                         <div class="toggle-knob"></div>
@@ -177,183 +168,124 @@
             <div class="control-section">
                 <h3>📢 Response</h3>
                 <div id="response"></div>
-                <button class="secondary" id="clear-btn" style="margin-top: 12px;">Clear All</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Replit backend proxy server
-        const BACKEND_URL = "https://server-tools--hcarbajal.replit.app";
+        const BACKEND_URL = "https://node-express--hcarbajal.replit.app";
         const VOICE_ID = "si0svtk05vPEuvwAW93c";
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        
         canvas.width = 500;
         canvas.height = 400;
         
         let isSpeaking = false;
         let microphoneEnabled = false;
-        let isListening = false;
         let recognition = null;
-        let avatarState = 'happy';
         let frameCount = 0;
         let currentAudio = null;
         
-        // Panda Avatar
         class PandaAvatar {
             constructor() {
                 this.x = canvas.width / 2;
                 this.y = canvas.height / 2;
-                this.faceRadius = 100;
                 this.state = 'happy';
             }
-            
             draw(mouthOpen) {
-                // Main white face
+                // Face
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.faceRadius, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, 100, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.strokeStyle = '#333';
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 
-                // Left ear (black)
+                // Ears
                 ctx.fillStyle = '#000';
                 ctx.beginPath();
                 ctx.arc(this.x - 70, this.y - 80, 30, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Right ear (black)
                 ctx.beginPath();
                 ctx.arc(this.x + 70, this.y - 80, 30, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Left eye patch (black)
-                ctx.fillStyle = '#000';
+                // Eye patches
                 ctx.beginPath();
                 ctx.ellipse(this.x - 40, this.y - 20, 25, 35, 0, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Right eye patch (black)
                 ctx.beginPath();
                 ctx.ellipse(this.x + 40, this.y - 20, 25, 35, 0, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Left eye white
+                // Eyes
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
                 ctx.arc(this.x - 40, this.y - 25, 12, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Right eye white
                 ctx.beginPath();
                 ctx.arc(this.x + 40, this.y - 25, 12, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Left pupil
+                // Pupils
                 ctx.fillStyle = '#000';
                 ctx.beginPath();
                 ctx.arc(this.x - 40, this.y - 25, 8, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Right pupil
                 ctx.beginPath();
                 ctx.arc(this.x + 40, this.y - 25, 8, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Eyes shine
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(this.x - 37, this.y - 28, 3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(this.x + 43, this.y - 28, 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Nose (black)
-                ctx.fillStyle = '#000';
+                // Nose
                 ctx.beginPath();
                 ctx.arc(this.x, this.y + 15, 10, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // Mouth
-                this.drawMouth(mouthOpen);
-                
-                // Blush (when happy)
-                if (this.state === 'happy' || this.state === 'excited') {
-                    ctx.fillStyle = 'rgba(255, 182, 193, 0.5)';
-                    ctx.beginPath();
-                    ctx.arc(this.x - 65, this.y + 20, 15, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(this.x + 65, this.y + 20, 15, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            
-            drawMouth(mouthOpen) {
                 ctx.strokeStyle = '#333';
                 ctx.lineWidth = 3;
                 ctx.fillStyle = '#333';
                 
-                if (this.state === 'thinking') {
-                    // Worried mouth
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y + 55, 25, Math.PI * 0.5, Math.PI * 1.5);
-                    ctx.stroke();
-                } else if (isSpeaking) {
+                if (isSpeaking) {
                     if (mouthOpen) {
-                        // OPEN MOUTH - big O
                         ctx.beginPath();
                         ctx.ellipse(this.x, this.y + 55, 20, 30, 0, 0, Math.PI * 2);
                         ctx.fill();
                     } else {
-                        // CLOSED MOUTH - line
                         ctx.beginPath();
                         ctx.moveTo(this.x - 20, this.y + 55);
                         ctx.lineTo(this.x + 20, this.y + 55);
                         ctx.stroke();
                     }
                 } else {
-                    // Normal smile
                     ctx.beginPath();
                     ctx.arc(this.x, this.y + 50, 25, 0, Math.PI);
                     ctx.stroke();
                 }
             }
-            
-            setState(newState) {
-                this.state = newState;
-            }
         }
         
         const avatar = new PandaAvatar();
         
-        // Animation loop
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             frameCount++;
             
-            // Idle animation - gentle sway
-            if (!isSpeaking && !microphoneEnabled) {
+            if (!isSpeaking) {
                 avatar.x = canvas.width / 2 + Math.sin(frameCount * 0.02) * 8;
             } else {
                 avatar.x = canvas.width / 2;
             }
             
-            // Calculate mouth state: open for 15 frames, closed for 15 frames
             const mouthOpen = Math.floor((frameCount % 30) / 15) === 1;
-            
             avatar.draw(mouthOpen);
             requestAnimationFrame(animate);
         }
         animate();
         
-        // Setup UI
+        // Mic toggle
         document.getElementById('mic-toggle').addEventListener('click', () => {
             microphoneEnabled = !microphoneEnabled;
             const toggle = document.getElementById('mic-toggle');
@@ -362,13 +294,11 @@
                 toggle.classList.add('active');
                 document.getElementById('mic-status').textContent = 'ON';
                 updateStatus('Listening...', 'processing');
-                avatar.setState('happy');
-                startListening();
+                if (recognition) recognition.start();
             } else {
                 toggle.classList.remove('active');
                 document.getElementById('mic-status').textContent = 'OFF';
                 updateStatus('Ready', 'idle');
-                avatar.setState('happy');
                 if (recognition) recognition.stop();
             }
         });
@@ -382,16 +312,7 @@
             if (currentAudio) currentAudio.pause();
             isSpeaking = false;
             document.getElementById('stop-btn').style.display = 'none';
-            avatar.setState('happy');
             updateStatus('Stopped', 'idle');
-        });
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            document.getElementById('question-input').value = '';
-            document.getElementById('response').style.display = 'none';
-            if (currentAudio) currentAudio.pause();
-            isSpeaking = false;
-            avatar.setState('happy');
-            updateStatus('Ready', 'idle');
         });
         
         document.addEventListener('keydown', (e) => {
@@ -401,68 +322,39 @@
             }
         });
         
-        // Speech recognition
+        // Speech Recognition
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.continuous = true;
             recognition.lang = 'en-US';
-        } else {
-            console.warn('Speech Recognition not supported in this browser');
-        }
-        recognition.onstart = () => { isListening = true; };
-        recognition.onresult = (event) => {
-            if (!microphoneEnabled) return;
-            let transcript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                transcript += event.results[i][0].transcript;
-            }
-            document.getElementById('question-input').value = transcript;
-            if (event.results[event.results.length - 1].isFinal) {
-                setTimeout(askQuestion, 300);
-            }
-        };
-        recognition.onend = () => {
-            isListening = false;
-            if (microphoneEnabled && recognition) {
-                setTimeout(() => recognition.start(), 100);
-            }
-        };
-        
-        function startListening() {
-            if (recognition) {
-                try { recognition.start(); }
-                catch(e) { console.log('Could not start recognition:', e); }
-            } else {
-                alert('⚠️ Speech recognition not supported in this browser. Please type your question instead.');
-            }
+            
+            recognition.onresult = (event) => {
+                if (!microphoneEnabled) return;
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                document.getElementById('question-input').value = transcript;
+                if (event.results[event.results.length - 1].isFinal) {
+                    setTimeout(askQuestion, 300);
+                }
+            };
         }
         
         async function askQuestion() {
             const question = document.getElementById('question-input').value.trim();
             if (!question || isSpeaking) return;
             
-            if (BACKEND_URL.includes('your-replit')) {
-                alert('⚠️ Please update BACKEND_URL in the code with your Replit URL first!');
-                return;
-            }
-            
             isSpeaking = true;
-            avatar.setState('thinking');
             updateStatus('Processing...', 'processing');
             document.getElementById('ask-btn').disabled = true;
             document.getElementById('stop-btn').style.display = 'block';
             
             try {
-                // Call backend for Claude API
-                const endpoint = `${BACKEND_URL}/api/claude/v1/messages`;
-                console.log('Calling endpoint:', endpoint);
-                
-                const res = await fetch(endpoint, {
+                const res = await fetch(`${BACKEND_URL}/api/claude/v1/messages`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'claude-opus-4-5',
                         max_tokens: 1024,
@@ -470,13 +362,7 @@
                     }),
                 });
                 
-                console.log('Response status:', res.status);
-                
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    console.log('Error response:', errorText);
-                    throw new Error('Backend error: ' + res.status);
-                }
+                if (!res.ok) throw new Error(`Backend error: ${res.status}`);
                 
                 const data = await res.json();
                 const response = data.content[0].text;
@@ -485,58 +371,38 @@
                 document.getElementById('response').style.display = 'block';
                 updateStatus('Speaking...', 'processing');
                 
-                avatar.setState('happy');
+                // Get voice
+                const audioRes = await fetch(`${BACKEND_URL}/api/elevenlabs/v1/text-to-speech/${VOICE_ID}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: response })
+                });
                 
-                // Use backend for TTS
-                await speakWithBackend(response);
+                if (!audioRes.ok) throw new Error(`TTS error: ${audioRes.status}`);
+                
+                const audioBlob = await audioRes.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                currentAudio = new Audio(audioUrl);
+                currentAudio.play();
+                
+                await new Promise(resolve => {
+                    currentAudio.onended = resolve;
+                    currentAudio.onerror = resolve;
+                });
                 
                 isSpeaking = false;
-                avatar.setState('happy');
                 document.getElementById('stop-btn').style.display = 'none';
                 updateStatus('Done!', 'idle');
                 
-            } catch(error) {
+            } catch (error) {
                 console.error(error);
                 document.getElementById('response').textContent = 'Error: ' + error.message;
                 document.getElementById('response').style.display = 'block';
                 updateStatus('Error', 'error');
                 isSpeaking = false;
-                avatar.setState('happy');
             }
             
             document.getElementById('ask-btn').disabled = false;
-        }
-        
-        async function speakWithBackend(text) {
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/elevenlabs/v1/text-to-speech/${VOICE_ID}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        text: text,
-                    }),
-                });
-                
-                if (!response.ok) {
-                    throw new Error('TTS error: ' + response.status);
-                }
-                
-                const audioBlob = await response.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                currentAudio = new Audio(audioUrl);
-                currentAudio.play();
-                
-                return new Promise((resolve) => {
-                    currentAudio.onended = () => resolve();
-                    currentAudio.onerror = () => resolve();
-                });
-            } catch(error) {
-                console.error('Backend TTS error:', error);
-                throw error;
-            }
         }
         
         function updateStatus(text, type = 'idle') {
