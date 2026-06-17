@@ -174,7 +174,6 @@
 
     <script>
         const BACKEND_URL = "https://node-express--hcarbajal.replit.app";
-        const VOICE_ID = "si0svtk05vPEuvwAW93c";
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -185,13 +184,11 @@
         let microphoneEnabled = false;
         let recognition = null;
         let frameCount = 0;
-        let currentAudio = null;
         
         class PandaAvatar {
             constructor() {
                 this.x = canvas.width / 2;
                 this.y = canvas.height / 2;
-                this.state = 'happy';
             }
             draw(mouthOpen) {
                 // Face
@@ -309,7 +306,7 @@
         
         document.getElementById('ask-btn').addEventListener('click', askQuestion);
         document.getElementById('stop-btn').addEventListener('click', () => {
-            if (currentAudio) currentAudio.pause();
+            speechSynthesis.cancel();
             isSpeaking = false;
             document.getElementById('stop-btn').style.display = 'none';
             updateStatus('Stopped', 'idle');
@@ -371,23 +368,14 @@
                 document.getElementById('response').style.display = 'block';
                 updateStatus('Speaking...', 'processing');
                 
-                // Get voice
-                const audioRes = await fetch(`${BACKEND_URL}/api/elevenlabs/v1/text-to-speech/${VOICE_ID}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: response })
-                });
-                
-                if (!audioRes.ok) throw new Error(`TTS error: ${audioRes.status}`);
-                
-                const audioBlob = await audioRes.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                currentAudio = new Audio(audioUrl);
-                currentAudio.play();
+                // Use browser TTS
+                const utterance = new SpeechSynthesisUtterance(response);
+                utterance.rate = 0.9;
                 
                 await new Promise(resolve => {
-                    currentAudio.onended = resolve;
-                    currentAudio.onerror = resolve;
+                    utterance.onend = resolve;
+                    utterance.onerror = resolve;
+                    speechSynthesis.speak(utterance);
                 });
                 
                 isSpeaking = false;
